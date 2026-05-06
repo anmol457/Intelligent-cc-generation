@@ -1,0 +1,2 @@
+[console_scripts]
+intelligent-cc = intelligent_cc.cli:main

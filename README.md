@@ -1,0 +1,64 @@
+# Intelligent Closed Caption Suggestion Tool
+
+AI-assisted backend pipeline for finding meaningful non-speech moments in a video and exporting closed-caption suggestions as SRT or SLS. The pipeline combines:
+
+- YAMNet sound event detection for non-speech audio events.
+- OpenCV frame sampling and optical-flow motion analysis.
+- Face-position shift detection using MediaPipe when installed, with an OpenCV Haar-cascade fallback in the default setup.
+- A decision engine that avoids captioning low-impact ambient sounds unless the audio event and scene reaction justify it.
+
+## Python And Dependencies
+
+Use Python `3.10.x`. The project pins `>=3.10,<3.11` because this machine has Python 3.10 installed and TensorFlow `2.10.x` provides compatible native Windows wheels for that runtime.
+
+The app uses `imageio-ffmpeg` to provide an FFmpeg executable, so you do not need a separate system FFmpeg install for normal CLI use.
+
+```powershell
+py -3.10 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+pip install -e .
+```
+
+YAMNet is loaded from TensorFlow Hub on first use, so the first run needs internet access to download the model cache.
+
+## Usage
+
+```powershell
+intelligent-cc video.mp4 -o output.srt
+```
+
+For structured JSON-style output:
+
+```powershell
+intelligent-cc video.mp4 --format sls -o output.sls
+```
+
+Useful tuning flags:
+
+```powershell
+intelligent-cc video.mp4 --audio-threshold 0.30 --decision-threshold 0.55 --max-events 20
+```
+
+## Pipeline
+
+1. Extract mono 16 kHz audio from the input video with FFmpeg.
+2. Run YAMNet and keep captionable non-speech classes such as honking, glass breaking, alarms, applause, explosions, sirens, laughter, and music.
+3. Merge adjacent detections into timestamped audio events with confidence scores.
+4. Sample video frames around each event timestamp.
+5. Score visible reaction using optical flow and MediaPipe face-center movement.
+6. Combine audio confidence, visual reaction confidence, and high-impact label rules.
+7. Export accepted suggestions as SRT captions like `[honking]`.
+
+## Development
+
+```powershell
+pip install -e ".[dev]"
+pytest
+```
+
+## Notes
+
+- The included `video.mp4` can be used for a smoke test after dependencies are installed.
+- The reaction detector is intentionally conservative: routine background sounds are rejected unless paired with visible motion/reaction or a high-impact audio label.
+- For production review workflows, keep rejected events as diagnostic metadata by using the Python API and inspecting `PipelineResult.audio_events`.
